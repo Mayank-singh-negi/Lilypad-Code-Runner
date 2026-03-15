@@ -6,7 +6,7 @@
 
 ## 🎯 What is This?
 
-Leafy Code Runner is a visual, interactive compiler designed to make programming fun and beginner-friendly.  
+Lilypad Code Runner is a visual, interactive compiler designed to make programming fun and beginner-friendly.  
 Instead of boring error messages, your commands make a **frog jump, move, spin, glow, and sparkle**!
 
 ✅ Real-time code parsing  
