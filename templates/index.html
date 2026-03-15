@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Leafy Code Runner</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;700&family=JetBrains+Mono&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+
+</head>
+
+<body>
+
+<div class="header">
+  <h2>Leafy Code Runner</h2>
+  <div class="phase-bar">
+    <span id="pill-lexical" class="pill pill-amber">Lexical</span>
+    <span id="pill-syntax" class="pill pill-amber">Syntax</span>
+    <span id="pill-semantic" class="pill pill-red">Semantic</span>
+    <span id="pill-symbol" class="pill pill-red">Symbol Table</span>
+    <span id="pill-ir" class="pill pill-red">IR</span>
+    <span id="pill-opt" class="pill pill-red">Optimization</span>
+    <span id="pill-exec" class="pill pill-green">Execution</span>
+  </div>
+</div>
+
+<div class="app">
+
+<div class="panel">
+
+<div id="status">Ready</div>
+
+<div id="gameArea">
+  <img id="frog" src="/static/img/frog.png">
+</div>
+
+<textarea id="codeInput" style="margin-top:20px;"></textarea>
+
+<h3>Code with Emojis</h3>
+<div class="emoji-bar">
+<button onclick="addCommand('moveRight(1);')">🌿➡️</button>
+<button onclick="addCommand('moveLeft(1);')">🍃⬅️</button>
+<button onclick="addCommand('jump();')">🐸⬆️</button>
+<button onclick="addCommand('wait(1);')">🕒</button>
+<button onclick="addCommand('glow();')">💡</button>
+<button onclick="addCommand('spin();')">🌀</button>
+<button onclick="addCommand('dash();')">💨</button>
+<button onclick="addCommand('float();')">🎈</button>
+</div>
+
+<button onclick="undoLastCommand()">↩ Undo</button>
+<button onclick="clearCode()">🧹 Clear Input</button>
+<button onclick="resetWorkspace()" style="background:#dc3545;">🔄 Reset All</button>
+
+<h3>Quick Add Commands</h3>
+<div style="display: flex; gap: 10px; margin-bottom: 15px;">
+  <div class="instruction" onclick="addCommand('moveRight(1);')" style="margin:0;">moveRight(n);</div>
+  <div class="instruction" onclick="addCommand('moveLeft(1);')" style="margin:0;">moveLeft(n);</div>
+  <div class="instruction" onclick="addCommand('jump();')" style="margin:0;">jump();</div>
+  <div class="instruction" onclick="addCommand('wait(1);')" style="margin:0;">wait(n);</div>
+</div>
+
+<button onclick="runCode()">▶ Run Code</button>
+
+<h3>Execution Log <span id="logStatus" style="float:right;font-size:0.6em;color:gray"></span></h3>
+<pre id="execLog" style="background:#fbfbfb; padding: 15px; border-radius: 12px; min-height: 80px; border: 1px solid #eee;"></pre>
+
+<h3>Optimization Phase</h3>
+<div id="optimizePanel" class="optimize-panel"></div>
+
+</div>
+
+<div class="panel">
+
+<h3>1. Lexical — Token Stream</h3>
+<pre id="tokens"></pre>
+
+<h3>2. Syntax — Parse Tree</h3>
+<pre id="parseTree"></pre>
+
+<h3>3. Semantic Checks</h3>
+<ul id="semanticChecks" class="checklist"></ul>
+
+<h3>4. Symbol Table</h3>
+<table id="symbolTable" class="symbol-table">
+  <thead>
+    <tr><th>Name</th><th>Type</th><th>Value</th><th>Scope</th></tr>
+  </thead>
+  <tbody></tbody>
+</table>
+
+<h3>5. Intermediate Representation</h3>
+<pre id="irPanel"></pre>
+
+</div>
+
+</div>
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+
+</body>
+</html>
