@@ -1,4 +1,4 @@
-# 🐸 Leafy Code Runner 🌿  
+# 🐸 Lilypad-Code-Runner 🌿  
 **A Gamified Compiler Design Project**  
 
 
