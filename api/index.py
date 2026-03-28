@@ -1,7 +1,6 @@
 from flask import Flask, render_template, request, jsonify
 import re
 import os
-from vercel_wsgi import handle
 
 app = Flask(__name__, 
     template_folder='../templates',
@@ -200,7 +199,3 @@ def run():
     }
 
     return jsonify({"actions": optimized_actions, "tokens": tokens, "semantics": list(semantics.values()), "ast": ast, "symbols": symbol_table, "optimization": optimization_data})
-
-# Vercel handler
-def handler(environ, start_response):
-    return handle(app.wsgi_app, environ, start_response)
