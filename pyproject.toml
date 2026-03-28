@@ -2,7 +2,7 @@
 name = "lilypad-code-runner"
 version = "1.0.0"
 description = "Lilypad Code Runner - Visual Programming Environment"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dependencies = [
     "Flask==3.1.3"
 ]
