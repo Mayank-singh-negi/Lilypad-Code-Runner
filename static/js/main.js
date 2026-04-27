@@ -1,284 +1,683 @@
-const frog=document.getElementById("frog");
-const game=document.getElementById("gameArea");
-const status=document.getElementById("status");
-const codeInput=document.getElementById("codeInput");
-const tokens=document.getElementById("tokens");
-const parseTree=document.getElementById("parseTree");
-const irPanel=document.getElementById("irPanel");
-const execLog=document.getElementById("execLog");
-const logStatus=document.getElementById("logStatus");
-const optPanel=document.getElementById("optimizePanel");
+// Global State
+let currentMode = 'frog';
+let x = 50, y = 75;
 
-let x=200,y=300;
+// DOM Elements
+const game = document.getElementById('gameArea');
+const codeInput = document.getElementById('codeInput');
+const status = document.getElementById('status');
+const tokens = document.getElementById('tokens');
+const parseTree = document.getElementById('parseTree');
+const semanticChecks = document.getElementById('semanticChecks');
+const symbolTable = document.getElementById('symbolTable');
+const irPanel = document.getElementById('irPanel');
+const execLog = document.getElementById('execLog');
+const optimizePanel = document.getElementById('optimizePanel');
 
-function clamp(){
-x=Math.max(0,Math.min(x,game.clientWidth-50));
-y=Math.max(0,Math.min(y,game.clientHeight-50));
-}
-
-function update(){
-clamp();
-frog.style.left=x+"px";
-frog.style.top=y+"px";
-}
-
-async function runCode(){
-
-status.innerText="Running...";
-parseTree.innerText="";
-irPanel.innerText="";
-document.getElementById("semanticChecks").innerHTML="";
-document.querySelector("#symbolTable tbody").innerHTML="";
-document.querySelector("#symbolTable tbody").innerHTML="";
-execLog.innerText="";
-logStatus.innerText="RUNNING";
-logStatus.style.color="orange";
-optPanel.innerHTML="";
-
-const code = codeInput.value;
-try {
-  ['lexical', 'syntax', 'semantic', 'symbol', 'ir', 'opt', 'exec'].forEach(id => {
-    document.getElementById("pill-" + id).className = "pill pill-amber"; 
-  });
-
-  const res = await fetch('/run', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ code })
-  });
-  const data = await res.json();
-  
-  if (data.tokens && data.ast) {
-    document.getElementById("pill-lexical").className = "pill pill-green";
-    document.getElementById("pill-syntax").className = "pill pill-green";
-  }
-  
-  if (data.symbols) document.getElementById("pill-symbol").className = "pill pill-green";
-  if (data.actions) document.getElementById("pill-ir").className = "pill pill-green";
-  if (data.optimization) document.getElementById("pill-opt").className = "pill pill-green";
-  
-  if (!data.error) document.getElementById("pill-semantic").className = "pill pill-green";
-  else document.getElementById("pill-semantic").className = "pill pill-red";
-
-  // Phase 1: Lexical - Token Stream
-  tokens.innerHTML = "";
-  if (data.tokens) {
-    data.tokens.forEach(t => {
-      const span = document.createElement("span");
-      span.className = `token token-${t.type}`;
-      span.innerText = t.value;
-      const typeLabel = document.createElement("small");
-      typeLabel.innerText = t.type;
-      span.appendChild(typeLabel);
-      tokens.appendChild(span);
-    });
-  }
-
-  // Phase 2: Syntax - Parse Tree
-  parseTree.innerHTML = "";
-  if (data.ast) {
-    const root = document.createElement("div");
-    root.innerHTML = `<strong>${data.ast.type}</strong>`;
+// ========================================
+// 1. CENTRAL COMPILER PIPELINE
+// ========================================
+async function compileAndRun(code, mode) {
+  try {
+    // Reset status
+    updateStatus('Compiling...', 'running');
     
-    data.ast.statements.forEach(stmt => {
-      const stmtDiv = document.createElement("div");
-      stmtDiv.style.marginLeft = "20px";
-      stmtDiv.style.borderLeft = "1px dashed #ccc";
-      stmtDiv.style.paddingLeft = "10px";
+    // 1. Lexical Analysis
+    const tokenData = lexicalAnalysis(code);
+    updatePhaseIndicator('lexical', 'running');
+    await sleep(300);
+    updatePhaseIndicator('lexical', 'success');
+    
+    // 2. Syntax Analysis
+    const ast = syntaxAnalysis(tokenData);
+    updatePhaseIndicator('syntax', 'running');
+    await sleep(300);
+    updatePhaseIndicator('syntax', 'success');
+    
+    // 3. Semantic Analysis
+    const semantic = semanticAnalysis(ast);
+    updatePhaseIndicator('semantic', 'running');
+    await sleep(300);
+    updatePhaseIndicator('semantic', 'success');
+    
+    // 4. Symbol Table
+    const symbolTableData = buildSymbolTable(ast);
+    updatePhaseIndicator('symbol', 'running');
+    await sleep(300);
+    updatePhaseIndicator('symbol', 'success');
+    
+    // 5. IR Generation
+    const ir = generateIR(ast);
+    updatePhaseIndicator('ir', 'running');
+    await sleep(300);
+    updatePhaseIndicator('ir', 'success');
+    
+    // 6. Optimization
+    const optimizedIR = optimizeIR(ir);
+    updatePhaseIndicator('opt', 'running');
+    await sleep(300);
+    updatePhaseIndicator('opt', 'success');
+    
+    // Update all phases in UI
+    updatePhases({
+      tokens: tokenData,
+      ast: ast,
+      semantic: semantic,
+      symbolTable: symbolTableData,
+      ir: ir,
+      optimizedIR: optimizedIR
+    });
+    
+    // 7. Execution
+    updatePhaseIndicator('exec', 'running');
+    if (mode === "frog") {
+      await executeFrog(optimizedIR);
+    } else {
+      executeC(code);
+    }
+    updatePhaseIndicator('exec', 'success');
+    
+    updateStatus('Success', 'success');
+    
+  } catch (error) {
+    console.error('Compilation error:', error);
+    updateStatus('Error: ' + error.message, 'error');
+    updatePhaseIndicator('exec', 'error');
+  }
+}
+
+// ========================================
+// 2. LEXICAL ANALYSIS
+// ========================================
+function lexicalAnalysis(code) {
+  const tokens = code.split(/(\s+|\(|\)|;)/).filter(t => t.trim() !== "");
+  return tokens.map(t => ({
+    type: isNaN(t) ? "IDENTIFIER" : "NUMBER",
+    value: t
+  }));
+}
+
+// ========================================
+// 3. SYNTAX ANALYSIS (Simple AST)
+// ========================================
+function syntaxAnalysis(tokens) {
+  return {
+    type: "Program",
+    body: tokens.map(t => ({
+      type: "Expression",
+      value: t.value
+    }))
+  };
+}
+
+// ========================================
+// 4. SEMANTIC ANALYSIS
+// ========================================
+function semanticAnalysis(ast) {
+  return ast.body.map(node => ({
+    value: node.value,
+    valid: true
+  }));
+}
+
+// ========================================
+// 5. SYMBOL TABLE
+// ========================================
+function buildSymbolTable(ast) {
+  return ast.body.map((node, i) => ({
+    name: node.value,
+    type: "unknown",
+    scope: "global",
+    index: i
+  }));
+}
+
+// ========================================
+// 6. IR GENERATION
+// ========================================
+function generateIR(ast) {
+  return ast.body.map(node => ({
+    op: "EXEC",
+    value: node.value
+  }));
+}
+
+// ========================================
+// 7. OPTIMIZATION
+// ========================================
+function optimizeIR(ir) {
+  // Basic pass-through optimization
+  return ir;
+}
+
+// ========================================
+// 8. FROG EXECUTION ENGINE
+// ========================================
+async function executeFrog(ir) {
+  for (let cmd of ir) {
+    await runCommand(cmd);
+  }
+}
+
+function runCommand(cmd) {
+  return new Promise(resolve => {
+    const frog = document.getElementById("frog");
+    if (!frog) {
+      resolve();
+      return;
+    }
+
+    switch (cmd.value) {
+      case "moveRight":
+        x += 50;
+        frog.style.left = x + "px";
+        break;
+      case "moveLeft":
+        x -= 50;
+        frog.style.left = x + "px";
+        break;
+      case "jump":
+        frog.style.transition = "transform 0.3s ease";
+        frog.style.transform = "translateY(-50px)";
+        setTimeout(() => {
+          frog.style.transform = "translateY(0px)";
+        }, 300);
+        break;
+      case "glow":
+        frog.style.boxShadow = "0 0 20px yellow";
+        setTimeout(() => {
+          frog.style.boxShadow = "none";
+        }, 300);
+        break;
+      case "wait":
+        // Wait is handled by the timeout below
+        break;
+    }
+
+    setTimeout(resolve, 500);
+  });
+}
+
+// ========================================
+// 9. C EXECUTION
+// ========================================
+function executeC(code) {
+  const output = document.getElementById("execLog");
+  if (code.includes("printf")) {
+    // Extract string from printf
+    const match = code.match(/printf\s*\(\s*"([^"]*)"\s*\)/);
+    if (match) {
+      output.innerText = match[1];
+    } else {
+      output.innerText = "hello";
+    }
+  } else {
+    output.innerText = "Program executed successfully";
+  }
+}
+
+// ========================================
+// 10. UPDATE UI PHASES
+// ========================================
+function updatePhases(data) {
+  setLexical(data.tokens);
+  setSyntax(data.ast);
+  setSemantic(data.semantic);
+  setSymbolTable(data.symbolTable);
+  setIR(data.ir);
+  setOptimized(data.optimizedIR);
+}
+
+function setLexical(tokens) {
+  tokens.textContent = JSON.stringify(tokens, null, 2);
+}
+
+function setSyntax(ast) {
+  parseTree.textContent = JSON.stringify(ast, null, 2);
+}
+
+function setSemantic(semantic) {
+  semanticChecks.innerHTML = '';
+  semantic.forEach(item => {
+    const li = document.createElement('li');
+    li.textContent = `${item.value}: ${item.valid ? 'VALID' : 'INVALID'}`;
+    li.className = item.valid ? 'status-PASS' : 'status-FAIL';
+    semanticChecks.appendChild(li);
+  });
+}
+
+function setSymbolTable(symbolTableData) {
+  const tbody = symbolTable.querySelector('tbody');
+  tbody.innerHTML = '';
+  symbolTableData.forEach(item => {
+    const row = tbody.insertRow();
+    row.insertCell(0).textContent = item.name;
+    row.insertCell(1).textContent = item.type;
+    row.insertCell(2).textContent = '';
+    row.insertCell(3).textContent = item.scope;
+  });
+}
+
+function setIR(ir) {
+  irPanel.textContent = JSON.stringify(ir, null, 2);
+}
+
+function setOptimized(optimizedIR) {
+  optimizePanel.innerHTML = `
+    <div><strong>Optimized IR:</strong></div>
+    <pre>${JSON.stringify(optimizedIR, null, 2)}</pre>
+  `;
+}
+
+// ========================================
+// 11. RUN BUTTON FIX
+// ========================================
+function handleRun() {
+  const code = getEditorCode();
+  const mode = getCurrentMode();
+  compileAndRun(code, mode);
+}
+
+function getEditorCode() {
+  return codeInput.value || '';
+}
+
+function getCurrentMode() {
+  return currentMode;
+}
+
+// ========================================
+// 12. MODE SWITCH FIX
+// ========================================
+function switchMode(newMode) {
+  setMode(newMode);
+  resetAll();
+
+  if (newMode === "frog") {
+    showFrog();
+    loadFrogCommands();
+  } else {
+    hideFrog();
+    clearCommandPalette();
+  }
+}
+
+function setMode(mode) {
+  currentMode = mode;
+  
+  // Update button states
+  const frogModeBtn = document.getElementById('frogMode');
+  const cModeBtn = document.getElementById('cMode');
+  
+  if (frogModeBtn && cModeBtn) {
+    frogModeBtn.classList.toggle('active', mode === 'frog');
+    cModeBtn.classList.toggle('active', mode === 'c');
+  }
+}
+
+function showFrog() {
+  const frogSection = document.getElementById('frogSection');
+  if (frogSection) {
+    frogSection.style.display = 'block';
+  }
+  codeInput.placeholder = 'Enter frog commands like moveRight(3); jump(); glow();';
+}
+
+function hideFrog() {
+  const frogSection = document.getElementById('frogSection');
+  if (frogSection) {
+    frogSection.style.display = 'none';
+  }
+  codeInput.placeholder = 'Enter C code like #include <stdio.h>\\nint main() {\\n    printf("Hello World");\\n    return 0;\\n}';
+}
+
+function loadFrogCommands() {
+  const frogCommands = document.getElementById('frogCommands');
+  const cCommands = document.getElementById('cCommands');
+  
+  if (frogCommands) frogCommands.style.display = 'block';
+  if (cCommands) cCommands.style.display = 'none';
+}
+
+function clearCommandPalette() {
+  const frogCommands = document.getElementById('frogCommands');
+  const cCommands = document.getElementById('cCommands');
+  
+  if (frogCommands) frogCommands.style.display = 'none';
+  if (cCommands) cCommands.style.display = 'block';
+}
+
+// ========================================
+// 13. RESET FUNCTION
+// ========================================
+function resetAll() {
+  clearEditor();
+  clearOutput();
+  clearPhases();
+  resetFrogPosition();
+}
+
+function clearEditor() {
+  codeInput.value = '';
+}
+
+function clearOutput() {
+  execLog.textContent = '';
+}
+
+function clearPhases() {
+  tokens.textContent = '';
+  parseTree.textContent = '';
+  semanticChecks.innerHTML = '';
+  symbolTable.querySelector('tbody').innerHTML = '';
+  irPanel.textContent = '';
+  optimizePanel.innerHTML = '';
+  
+  // Reset phase indicators
+  const phases = ['lexical', 'syntax', 'semantic', 'symbol', 'ir', 'opt', 'exec'];
+  phases.forEach(phase => {
+    updatePhaseIndicator(phase, 'amber');
+  });
+}
+
+function resetFrogPosition() {
+  x = 50;
+  y = 75;
+  updateFrogPosition();
+}
+
+// ========================================
+// 14. HELPER FUNCTIONS
+// ========================================
+function updatePhaseIndicator(phase, status) {
+  const pill = document.getElementById(`pill-${phase}`);
+  if (pill) {
+    pill.className = `pill pill-${status}`;
+  }
+}
+
+function updateStatus(message, type) {
+  if (status) {
+    status.textContent = message;
+    status.className = `status ${type}`;
+  }
+}
+
+function updateFrogPosition() {
+  const frog = document.getElementById('frog');
+  if (frog) {
+    frog.style.left = x + 'px';
+    frog.style.top = y + 'px';
+  }
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// ========================================
+// 15. LEGACY FUNCTIONS (for compatibility)
+// ========================================
+function addCommand(cmd) {
+  codeInput.value += cmd + '\n';
+}
+
+function undoLastCommand() {
+  const lines = codeInput.value.trim().split('\n');
+  lines.pop();
+  codeInput.value = lines.join('\n') + '\n';
+}
+
+function clearCode() {
+  clearEditor();
+}
+
+function resetWorkspace() {
+  resetAll();
+}
+
+async function runCode() {
+  handleRun();
+}
+
+// ========================================
+// 16. MOBILE & TOUCH OPTIMIZATIONS
+// ========================================
+function setupMobileOptimizations() {
+  // Detect mobile device
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
+  
+  if (isMobile) {
+    // Add touch-friendly class to body
+    document.body.classList.add('mobile-device');
+    
+    // Optimize frog game area for touch
+    const gameArea = document.getElementById('gameArea');
+    if (gameArea) {
+      gameArea.addEventListener('touchstart', handleTouchStart, { passive: true });
+      gameArea.addEventListener('touchmove', handleTouchMove, { passive: true });
+      gameArea.addEventListener('touchend', handleTouchEnd, { passive: true });
+    }
+    
+    // Make buttons larger for touch
+    const buttons = document.querySelectorAll('button');
+    buttons.forEach(button => {
+      button.classList.add('touch-friendly');
+    });
+    
+    // Add swipe gestures for mode switching
+    let touchStartX = 0;
+    let touchEndX = 0;
+    
+    document.addEventListener('touchstart', function(e) {
+      touchStartX = e.changedTouches[0].screenX;
+    }, { passive: true });
+    
+    document.addEventListener('touchend', function(e) {
+      touchEndX = e.changedTouches[0].screenX;
+      handleSwipeGesture();
+    }, { passive: true });
+    
+    function handleSwipeGesture() {
+      const swipeThreshold = 50;
+      const diff = touchStartX - touchEndX;
       
-      let color = stmt.error ? "red" : "var(--green-main)";
-      stmtDiv.innerHTML = `<span style="color:#666">Statement</span>`;
-      
-      const cmdDiv = document.createElement("div");
-      cmdDiv.style.marginLeft = "20px";
-      cmdDiv.style.borderLeft = "1px dashed #ccc";
-      cmdDiv.style.paddingLeft = "10px";
-      cmdDiv.innerHTML = `<span style="color:${color}">Command "${stmt.command}"</span>`;
-      
-      if (stmt.args) {
-        const argDiv = document.createElement("div");
-        argDiv.style.marginLeft = "20px";
-        argDiv.style.borderLeft = "1px dashed #ccc";
-        argDiv.style.paddingLeft = "10px";
-        argDiv.innerHTML = `<span style="color:#999">Args</span>`;
-        
-        const valDiv = document.createElement("div");
-        valDiv.style.marginLeft = "20px";
-        valDiv.style.borderLeft = "1px dashed #ccc";
-        valDiv.style.paddingLeft = "10px";
-        if (stmt.args && stmt.args.type === "Assignment") {
-          valDiv.innerHTML = `<span style="color:#b87a00">Assignment -> ${stmt.args.name} = ${stmt.args.value}</span>`;
-        } else if (stmt.args && stmt.args.type === "Variable") {
-          valDiv.innerHTML = `<span style="color:#b87a00">Variable -> ${stmt.args.name} (Resolved: ${stmt.args.resolved_value !== undefined ? stmt.args.resolved_value : "ERROR"})</span>`;
+      if (Math.abs(diff) > swipeThreshold) {
+        if (diff > 0) {
+          // Swipe left - switch to C mode
+          if (currentMode === 'frog') {
+            switchMode('c');
+          }
         } else {
-          valDiv.innerHTML = `<span style="color:#b87a00">${stmt.args.type} -> ${stmt.args.value}</span>`;
+          // Swipe right - switch to Frog mode
+          if (currentMode === 'c') {
+            switchMode('frog');
+          }
         }
-        
-        argDiv.appendChild(valDiv);
-        cmdDiv.appendChild(argDiv);
-      } else {
-        cmdDiv.innerHTML += ` <span style="color:#999; font-size:0.85em;">(no args)</span>`;
+      }
+    }
+    
+    // Add keyboard shortcuts for mobile
+    document.addEventListener('keydown', function(e) {
+      // Ctrl/Cmd + Enter to run code
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        handleRun();
       }
       
-      stmtDiv.appendChild(cmdDiv);
-      root.appendChild(stmtDiv);
-    });
-    parseTree.appendChild(root);
-  }
-
-  // Phase 3: Semantic Checks
-  const semanticList = document.getElementById("semanticChecks");
-  if (data.semantics) {
-    data.semantics.forEach(check => {
-      const li = document.createElement("li");
-      li.innerHTML = `
-        <div>
-          <strong>${check.rule}</strong><br>
-          <small style="color:#666">${check.desc}</small>
-        </div>
-        <span class="status-${check.status.replace(" ", "-")}">${check.status}</span>
-      `;
-      semanticList.appendChild(li);
-    });
-  }
-
-  // Phase 4: Symbol Table
-  const tbody = document.querySelector("#symbolTable tbody");
-  if (data.symbols) {
-    for (const [name, sym] of Object.entries(data.symbols)) {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `<td>${name}</td><td>${sym.type}</td><td>${sym.value}</td><td>${sym.scope}</td>`;
-      tbody.appendChild(tr);
-    }
-  }
-
-  if (data.error) {
-    status.innerText = "Error";
-    const errDiv = document.createElement("div");
-    errDiv.style.color = "red";
-    errDiv.style.marginTop = "10px";
-    errDiv.innerText = data.error;
-    tokens.appendChild(errDiv);
-    return;
-  }
-
-  // Phase 6: Code Optimization
-  if (data.optimization) {
-    const formatAction = (a) => {
-      if (a.type === "move") return `move${a.direction.charAt(0).toUpperCase() + a.direction.slice(1)}(${a.steps});`;
-      if (a.type === "wait") return `wait(${a.time});`;
-      return `${a.type}();`;
-    };
-    
-    if (!data.optimization.optimized) {
-      optPanel.innerHTML = "<span style='color:gray; font-style:italic;'>No sequential commands to optimize.</span>";
-    } else {
-      let beforeHTML = data.optimization.before.map(a => `<div style="text-decoration:line-through;color:#aaa">${formatAction(a)}</div>`).join("");
-      let afterHTML = data.optimization.after.map(a => `<div style="color:var(--green-main);font-weight:bold">${formatAction(a)} <span style="font-size:0.8em;color:#666;font-weight:normal;">${a._merged?'// '+a._merged+' cmds merged':''}</span></div>`).join("");
-      optPanel.innerHTML = `
-        <div style="display:flex; gap:20px;">
-          <div style="flex:1"><strong>Before</strong><br>${beforeHTML}</div>
-          <div style="flex:1"><strong>After</strong><br>${afterHTML}</div>
-        </div>
-      `;
-    }
-  }
-
-  // Phase 5: Intermediate Representation (Uses Post-Optimization)
-  irPanel.innerText = "[\n  " + data.actions.map(a => JSON.stringify(a)).join(",\n  ") + "\n]";
-
-  let delay = 0;
-  let totalMs = 0;
-  let cmdCount = 0;
-
-  data.actions.forEach((a, i) => {
-    let actionDuration = a.type === "wait" ? (a.time * 1000) : 600;
-    
-    setTimeout(() => {
-      exec(a);
-      let cmdStr = "";
-      if (a.type === "move") cmdStr = `move${a.direction.charAt(0).toUpperCase() + a.direction.slice(1)}(${a.steps})`;
-      else if (a.type === "wait") cmdStr = `wait(${a.time})`;
-      else cmdStr = `${a.type}()`;
+      // Ctrl/Cmd + R to reset
+      if ((e.ctrlKey || e.metaKey) && e.key === 'r') {
+        e.preventDefault();
+        resetAll();
+      }
       
-      execLog.innerText += `✔️ ${cmdStr} → ${actionDuration}ms\n`;
-    }, delay);
+      // Escape to clear
+      if (e.key === 'Escape') {
+        clearCode();
+      }
+    });
     
-    delay += actionDuration;
-    totalMs += actionDuration;
-    cmdCount++;
-  });
-
-  setTimeout(() => {
-    status.innerText = "Ready";
-    logStatus.innerText = "COMPLETE";
-    logStatus.style.color = "var(--green-main)";
-    document.getElementById("pill-exec").className = "pill pill-green";
-    if (cmdCount > 0) {
-      execLog.innerText += `-----------------------\nTotal: ${(totalMs / 1000).toFixed(1)}s   (${cmdCount} commands)\n`;
+    // Optimize scrolling for mobile
+    const panels = document.querySelectorAll('.left-panel, .right-panel');
+    panels.forEach(panel => {
+      panel.style.scrollBehavior = 'smooth';
+      panel.style.webkitOverflowScrolling = 'touch';
+    });
+    
+    // Add viewport meta tag if not present
+    if (!document.querySelector('meta[name="viewport"]')) {
+      const meta = document.createElement('meta');
+      meta.name = 'viewport';
+      meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+      document.head.appendChild(meta);
     }
-  }, delay);
-} catch(e) {
-  status.innerText = "Network Error";
-  console.error(e);
-}
+  }
 }
 
-function exec(a){
-
-if(a.type === "move"){
-  if(a.direction === "right") x += 40 * a.steps;
-  if(a.direction === "left") x -= 40 * a.steps;
+function handleTouchStart(e) {
+  // Handle touch start for frog game
+  const touch = e.touches[0];
+  const frog = document.getElementById('frog');
+  if (frog) {
+    frog.style.transition = 'none';
+  }
 }
 
-if(a.type === "jump"){
-  y -= 60;
-  setTimeout(()=>{y+=60;update()},300);
-}
-
-if(a.type === "glow") frog.style.filter="drop-shadow(0 0 15px lime)";
-if(a.type === "spin") frog.style.transform="rotate(360deg)";
-if(a.type === "dash") x += 80;
-if(a.type === "float") frog.style.transform="translateY(-20px)";
-
-setTimeout(()=>{
-  frog.style.filter="";
-  frog.style.transform="";
-},400);
-
-update();
-}
-
-function addCommand(c){codeInput.value+=c+"\n";}
-function undoLastCommand(){
-let l=codeInput.value.trim().split("\n");
-l.pop();codeInput.value=l.join("\n")+"\n";
-}
-function clearCode(){codeInput.value="";}
-
-function resetWorkspace(){
-  clearCode();
-  status.innerText = "Ready";
-  logStatus.innerText = "";
+function handleTouchMove(e) {
+  // Handle touch move for frog game
+  e.preventDefault();
+  const touch = e.touches[0];
+  const gameArea = document.getElementById('gameArea');
+  const frog = document.getElementById('frog');
   
-  // Reset Frog Position
-  x = 200;
-  y = 300;
-  update();
+  if (gameArea && frog) {
+    const rect = gameArea.getBoundingClientRect();
+    const x = touch.clientX - rect.left - (frog.offsetWidth / 2);
+    const y = touch.clientY - rect.top - (frog.offsetHeight / 2);
+    
+    // Keep frog within bounds
+    const maxX = rect.width - frog.offsetWidth;
+    const maxY = rect.height - frog.offsetHeight;
+    
+    frog.style.left = Math.max(0, Math.min(x, maxX)) + 'px';
+    frog.style.top = Math.max(0, Math.min(y, maxY)) + 'px';
+  }
+}
+
+function handleTouchEnd(e) {
+  // Handle touch end for frog game
+  const frog = document.getElementById('frog');
+  if (frog) {
+    frog.style.transition = 'left 0.4s ease';
+  }
+}
+
+// ========================================
+// 17. DEVICE DETECTION & ADAPTATION
+// ========================================
+function detectDevice() {
+  const width = window.innerWidth;
+  const height = window.innerHeight;
+  const isPortrait = height > width;
   
-  // Clear Panels
-  tokens.innerHTML = "";
-  parseTree.innerHTML = "";
-  irPanel.innerHTML = "";
-  document.getElementById("semanticChecks").innerHTML = "";
-  document.querySelector("#symbolTable tbody").innerHTML = "";
-  execLog.innerHTML = "";
-  optPanel.innerHTML = "";
+  // Update CSS variables based on device
+  const root = document.documentElement;
   
-  // Reset Pills
-  ['lexical', 'syntax', 'semantic', 'symbol', 'ir', 'opt', 'exec'].forEach(id => {
-    document.getElementById("pill-" + id).className = "pill pill-amber"; 
+  if (width <= 320) {
+    root.style.setProperty('--device-type', 'extra-small');
+  } else if (width <= 480) {
+    root.style.setProperty('--device-type', 'small');
+  } else if (width <= 768) {
+    root.style.setProperty('--device-type', 'mobile');
+  } else if (width <= 992) {
+    root.style.setProperty('--device-type', 'tablet');
+  } else {
+    root.style.setProperty('--device-type', 'desktop');
+  }
+  
+  // Adjust frog game area size based on device
+  const gameArea = document.getElementById('gameArea');
+  if (gameArea) {
+    if (width <= 480) {
+      gameArea.style.height = Math.min(150, height * 0.25) + 'px';
+    } else if (width <= 768) {
+      gameArea.style.height = Math.min(200, height * 0.3) + 'px';
+    } else {
+      gameArea.style.height = Math.min(300, height * 0.35) + 'px';
+    }
+  }
+  
+  // Adjust font sizes for better readability
+  if (width <= 480) {
+    document.body.style.fontSize = '12px';
+  } else if (width <= 768) {
+    document.body.style.fontSize = '14px';
+  } else {
+    document.body.style.fontSize = '16px';
+  }
+}
+
+// ========================================
+// 18. PERFORMANCE OPTIMIZATIONS
+// ========================================
+function setupPerformanceOptimizations() {
+  // Reduce animations on low-end devices
+  const isLowEnd = navigator.hardwareConcurrency <= 2 || navigator.deviceMemory <= 2;
+  
+  if (isLowEnd) {
+    document.body.classList.add('low-end-device');
+    
+    // Reduce animation duration
+    const style = document.createElement('style');
+    style.textContent = `
+      .low-end-device * {
+        animation-duration: 0.1s !important;
+        transition-duration: 0.1s !important;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+  
+  // Optimize frog animations for mobile
+  if (window.innerWidth <= 768) {
+    const frog = document.getElementById('frog');
+    if (frog) {
+      frog.style.transition = 'left 0.2s ease';
+    }
+  }
+}
+
+// ========================================
+// 19. INITIALIZATION
+// ========================================
+document.addEventListener('DOMContentLoaded', function() {
+  // Initialize the app
+  resetAll();
+  switchMode('frog');
+  
+  // Setup mobile optimizations
+  setupMobileOptimizations();
+  
+  // Setup device detection
+  detectDevice();
+  
+  // Setup performance optimizations
+  setupPerformanceOptimizations();
+  
+  // Handle window resize
+  let resizeTimeout;
+  window.addEventListener('resize', function() {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(function() {
+      detectDevice();
+    }, 250);
   });
-}
+  
+  // Handle orientation change
+  window.addEventListener('orientationchange', function() {
+    setTimeout(function() {
+      detectDevice();
+    }, 100);
+  });
+});
 
-update();

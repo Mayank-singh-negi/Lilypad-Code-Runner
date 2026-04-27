@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Leafy Code Runner</title>
+<title>LilyPad Code Runner</title>
 
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;700&family=JetBrains+Mono&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
@@ -12,88 +12,167 @@
 <body>
 
 <div class="header">
-  <h2>Leafy Code Runner</h2>
-  <div class="phase-bar">
-    <span id="pill-lexical" class="pill pill-amber">Lexical</span>
-    <span id="pill-syntax" class="pill pill-amber">Syntax</span>
-    <span id="pill-semantic" class="pill pill-red">Semantic</span>
-    <span id="pill-symbol" class="pill pill-red">Symbol Table</span>
-    <span id="pill-ir" class="pill pill-red">IR</span>
-    <span id="pill-opt" class="pill pill-red">Optimization</span>
-    <span id="pill-exec" class="pill pill-green">Execution</span>
+  <h2>LilyPad Code Runner</h2>
+  <div class="mode-toggle">
+    <button id="frogMode" class="mode-btn active" onclick="switchMode('frog')">🐸 Frog Mode</button>
+    <button id="cMode" class="mode-btn" onclick="switchMode('c')">💻 C Mode</button>
   </div>
 </div>
 
-<div class="app">
-
-<div class="panel">
-
-<div id="status">Ready</div>
-
-<div id="gameArea">
-  <img id="frog" src="/static/img/frog.png">
+<div class="phase-bar">
+  <span id="pill-lexical" class="pill pill-amber">Lexical</span>
+  <span id="pill-syntax" class="pill pill-amber">Syntax</span>
+  <span id="pill-semantic" class="pill pill-amber">Semantic</span>
+  <span id="pill-symbol" class="pill pill-amber">Symbol Table</span>
+  <span id="pill-ir" class="pill pill-amber">IR</span>
+  <span id="pill-opt" class="pill pill-amber">Optimization</span>
+  <span id="pill-exec" class="pill pill-amber">Execution</span>
 </div>
 
-<textarea id="codeInput" style="margin-top:20px;"></textarea>
+<div class="app-container">
+  <div class="main-grid">
+    
+    <!-- Left Panel -->
+    <div class="left-panel">
+      
+      <!-- Command Palette -->
+      <div class="section command-palette">
+        <div class="section-header">
+          <h3>Command Palette</h3>
+          <div id="status">Ready</div>
+        </div>
+        <div class="section-content">
+          <!-- Frog Commands (shown only in Frog Mode) -->
+          <div id="frogCommands" class="mode-commands">
+            <div class="emoji-controls">
+              <button onclick="addCommand('moveRight(1);')">🌿➡️</button>
+              <button onclick="addCommand('moveLeft(1);')">🍃⬅️</button>
+              <button onclick="addCommand('jump();')">🐸⬆️</button>
+              <button onclick="addCommand('wait(1);')">🕒</button>
+              <button onclick="addCommand('glow();')">💡</button>
+              <button onclick="addCommand('spin();')">🌀</button>
+              <button onclick="addCommand('dash();')">💨</button>
+              <button onclick="addCommand('float();')">🎈</button>
+            </div>
+            
+            <div class="quick-commands">
+              <div class="instruction" onclick="addCommand('moveRight(1);')">moveRight(n);</div>
+              <div class="instruction" onclick="addCommand('moveLeft(1);')">moveLeft(n);</div>
+              <div class="instruction" onclick="addCommand('jump();')">jump();</div>
+              <div class="instruction" onclick="addCommand('wait(1);')">wait(n);</div>
+            </div>
+          </div>
+          
+          <!-- C Commands (shown only in C Mode) -->
+          <div id="cCommands" class="mode-commands" style="display:none;">
+            <div class="c-templates">
+              <div class="instruction" onclick="addCommand('#include &lt;stdio.h&gt;\\nint main() {\\n    printf(&quot;Hello World&quot;);\\n    return 0;\\n}')">Hello World</div>
+              <div class="instruction" onclick="addCommand('#include &lt;stdio.h&gt;\\nint main() {\\n    int x = 5;\\n    printf(&quot;x = %d&quot;, x);\\n    return 0;\\n}')">Variable Example</div>
+              <div class="instruction" onclick="addCommand('#include &lt;stdio.h&gt;\\nint main() {\\n    for(int i=0; i&lt;5; i++) {\\n        printf(&quot;%d &quot;, i);\\n    }\\n    return 0;\\n}')">For Loop</div>
+            </div>
+          </div>
+        </div>
+      </div>
 
-<h3>Code with Emojis</h3>
-<div class="emoji-bar">
-<button onclick="addCommand('moveRight(1);')">🌿➡️</button>
-<button onclick="addCommand('moveLeft(1);')">🍃⬅️</button>
-<button onclick="addCommand('jump();')">🐸⬆️</button>
-<button onclick="addCommand('wait(1);')">🕒</button>
-<button onclick="addCommand('glow();')">💡</button>
-<button onclick="addCommand('spin();')">🌀</button>
-<button onclick="addCommand('dash();')">💨</button>
-<button onclick="addCommand('float();')">🎈</button>
-</div>
+      <!-- Code Editor Section -->
+      <div class="section">
+        <div class="section-header">
+          <h3>Code Editor</h3>
+        </div>
+        <div class="section-content">
+          <textarea id="codeInput" placeholder="Enter frog commands like moveRight(3); jump(); glow();"></textarea>
+          
+          <div class="control-buttons">
+            <button onclick="undoLastCommand()">↩ Undo</button>
+            <button onclick="clearCode()">🧹 Clear</button>
+            <button onclick="resetWorkspace()" class="reset-btn">🔄 Reset</button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Frog Visualization (shown only in Frog Mode) -->
+      <div class="section" id="frogSection">
+        <div class="section-header">
+          <h3>Frog Visualization</h3>
+        </div>
+        <div class="section-content">
+          <div id="gameArea">
+            <img id="frog" src="/static/img/frog.png">
+          </div>
+        </div>
+      </div>
 
-<button onclick="undoLastCommand()">↩ Undo</button>
-<button onclick="clearCode()">🧹 Clear Input</button>
-<button onclick="resetWorkspace()" style="background:#dc3545;">🔄 Reset All</button>
+    </div>
 
-<h3>Quick Add Commands</h3>
-<div style="display: flex; gap: 10px; margin-bottom: 15px;">
-  <div class="instruction" onclick="addCommand('moveRight(1);')" style="margin:0;">moveRight(n);</div>
-  <div class="instruction" onclick="addCommand('moveLeft(1);')" style="margin:0;">moveLeft(n);</div>
-  <div class="instruction" onclick="addCommand('jump();')" style="margin:0;">jump();</div>
-  <div class="instruction" onclick="addCommand('wait(1);')" style="margin:0;">wait(n);</div>
-</div>
+    <!-- Right Panel -->
+    <div class="right-panel">
+      
+      <!-- Compiler Phases -->
+      <div class="section compiler-phases">
+        <div class="section-header">
+          <h3>Compiler Phases</h3>
+        </div>
+        <div class="section-content">
+          <!-- Lexical Analysis -->
+          <div class="phase-section" id="phase-lexical">
+            <h4>1. Lexical — Token Stream</h4>
+            <pre id="tokens"></pre>
+          </div>
 
-<button onclick="runCode()">▶ Run Code</button>
+          <!-- Syntax Analysis -->
+          <div class="phase-section" id="phase-syntax">
+            <h4>2. Syntax — Parse Tree</h4>
+            <pre id="parseTree"></pre>
+          </div>
 
-<h3>Execution Log <span id="logStatus" style="float:right;font-size:0.6em;color:gray"></span></h3>
-<pre id="execLog" style="background:#fbfbfb; padding: 15px; border-radius: 12px; min-height: 80px; border: 1px solid #eee;"></pre>
+          <!-- Semantic Analysis -->
+          <div class="phase-section" id="phase-semantic">
+            <h4>3. Semantic Checks</h4>
+            <ul id="semanticChecks" class="checklist"></ul>
+          </div>
 
-<h3>Optimization Phase</h3>
-<div id="optimizePanel" class="optimize-panel"></div>
+          <!-- Symbol Table -->
+          <div class="phase-section" id="phase-symbol">
+            <h4>4. Symbol Table</h4>
+            <table id="symbolTable" class="symbol-table">
+              <thead>
+                <tr><th>Name</th><th>Type</th><th>Value</th><th>Scope</th></tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
 
-</div>
+          <!-- Intermediate Representation -->
+          <div class="phase-section" id="phase-ir">
+            <h4>5. Intermediate Representation</h4>
+            <pre id="irPanel"></pre>
+          </div>
 
-<div class="panel">
+          <!-- Optimization -->
+          <div class="phase-section" id="phase-opt">
+            <h4>6. Optimization</h4>
+            <div id="optimizePanel" class="optimize-panel"></div>
+          </div>
 
-<h3>1. Lexical — Token Stream</h3>
-<pre id="tokens"></pre>
+          <!-- Execution Log -->
+          <div class="phase-section" id="phase-exec">
+            <h4>7. Execution <span id="logStatus" style="float:right;font-size:0.8em;color:gray"></span></h4>
+            <pre id="execLog"></pre>
+          </div>
+        </div>
+      </div>
 
-<h3>2. Syntax — Parse Tree</h3>
-<pre id="parseTree"></pre>
+    </div>
 
-<h3>3. Semantic Checks</h3>
-<ul id="semanticChecks" class="checklist"></ul>
-
-<h3>4. Symbol Table</h3>
-<table id="symbolTable" class="symbol-table">
-  <thead>
-    <tr><th>Name</th><th>Type</th><th>Value</th><th>Scope</th></tr>
-  </thead>
-  <tbody></tbody>
-</table>
-
-<h3>5. Intermediate Representation</h3>
-<pre id="irPanel"></pre>
-
-</div>
-
+  </div>
+  
+  <!-- Bottom Action Bar -->
+  <div class="bottom-bar">
+    <button onclick="runCode()" class="run-button primary">▶ Run Code</button>
+    <button onclick="resetWorkspace()" class="reset-btn">🔄 Reset</button>
+    <button onclick="clearCode()" class="clear-btn">🧹 Clear</button>
+    <button onclick="undoLastCommand()" class="undo-btn">↩ Undo</button>
+  </div>
 </div>
 
 <script src="{{ url_for('static', filename='js/main.js') }}"></script>

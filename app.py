@@ -1,5 +1,7 @@
 from flask import Flask, render_template, request, jsonify
 import re
+import subprocess
+import os
 
 app = Flask(__name__)
 
@@ -31,7 +33,57 @@ def tokenize(code):
 
 @app.route('/run', methods=['POST'])
 def run():
-    code = request.get_json().get('code', '')
+    data = request.get_json()
+    code = data.get('code', '')
+    mode = data.get('mode', 'frog')
+    
+    if mode == 'c':
+        return compile_c_code(code)
+    else:
+        return process_frog_code(code)
+
+def compile_c_code(code):
+    # Create temporary C file
+    with open('temp.c', 'w') as f:
+        f.write(code)
+    
+    try:
+        # Compile C code
+        result = subprocess.run(['gcc', 'temp.c', '-o', 'temp.exe'], 
+                          capture_output=True, text=True, timeout=10)
+        
+        if result.returncode != 0:
+            return jsonify({
+                "error": f"Compilation Error: {result.stderr}",
+                "output": ""
+            })
+        
+        # Execute compiled code
+        result = subprocess.run(['./temp.exe'], capture_output=True, text=True, timeout=10)
+        
+        # Clean up temporary files
+        if os.path.exists('temp.c'):
+            os.remove('temp.c')
+        if os.path.exists('temp.exe'):
+            os.remove('temp.exe')
+            
+        return jsonify({
+            "output": result.stdout,
+            "error": result.stderr if result.stderr else None
+        })
+        
+    except subprocess.TimeoutExpired:
+        return jsonify({
+            "error": "Error: Compilation or execution timed out",
+            "output": ""
+        })
+    except Exception as e:
+        return jsonify({
+            "error": f"Error: {str(e)}",
+            "output": ""
+        })
+
+def process_frog_code(code):
     tokens = tokenize(code)
     lines = code.strip().split(';')
     actions = []
