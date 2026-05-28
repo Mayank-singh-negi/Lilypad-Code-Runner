@@ -199,28 +199,36 @@ function runCommand(cmd) {
 }
 
 // ========================================
-// 9. C EXECUTION
+// 9. C EXECUTION (Judge0 API)
 // ========================================
 async function executeC(code) {
   const output = document.getElementById("execLog");
   output.innerText = "Running...";
 
   try {
-    const response = await fetch('/run', {
+    // Submit code to Judge0 free public instance (language_id 50 = C GCC)
+    const submitRes = await fetch('https://ce.judge0.com/submissions?base64_encoded=false&wait=true', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code: code, mode: 'c' })
+      body: JSON.stringify({
+        source_code: code,
+        language_id: 50,
+        stdin: ''
+      })
     });
 
-    const data = await response.json();
+    const result = await submitRes.json();
 
-    if (data.error) {
-      output.innerText = data.error;
+    if (result.compile_output) {
+      output.innerText = "Compilation Error:\n" + result.compile_output;
+    } else if (result.stderr) {
+      output.innerText = "Runtime Error:\n" + result.stderr;
     } else {
-      output.innerText = data.output || "(no output)";
+      output.innerText = result.stdout || "(no output)";
     }
+
   } catch (err) {
-    output.innerText = "Error: Could not reach server. " + err.message;
+    output.innerText = "Error: " + err.message;
   }
 }
 
