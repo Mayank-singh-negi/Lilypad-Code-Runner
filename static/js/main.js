@@ -73,7 +73,7 @@ async function compileAndRun(code, mode) {
     if (mode === "frog") {
       await executeFrog(optimizedIR);
     } else {
-      executeC(code);
+      await executeC(code);
     }
     updatePhaseIndicator('exec', 'success');
     
@@ -201,18 +201,26 @@ function runCommand(cmd) {
 // ========================================
 // 9. C EXECUTION
 // ========================================
-function executeC(code) {
+async function executeC(code) {
   const output = document.getElementById("execLog");
-  if (code.includes("printf")) {
-    // Extract string from printf
-    const match = code.match(/printf\s*\(\s*"([^"]*)"\s*\)/);
-    if (match) {
-      output.innerText = match[1];
+  output.innerText = "Running...";
+
+  try {
+    const response = await fetch('/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: code, mode: 'c' })
+    });
+
+    const data = await response.json();
+
+    if (data.error) {
+      output.innerText = data.error;
     } else {
-      output.innerText = "hello";
+      output.innerText = data.output || "(no output)";
     }
-  } else {
-    output.innerText = "Program executed successfully";
+  } catch (err) {
+    output.innerText = "Error: Could not reach server. " + err.message;
   }
 }
 
